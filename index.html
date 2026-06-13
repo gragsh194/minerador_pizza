@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Minerador de Pizza</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #1a0a2e; font-family: 'Comic Sans MS', 'Chalkboard SE', cursive; overflow: hidden; user-select: none; }
+  #gameCanvas { display: block; margin: 0 auto; image-rendering: pixelated; }
+  #ui {
+    position: fixed; top: 0; left: 0; width: 100%; pointer-events: none;
+    display: flex; justify-content: space-between; align-items: flex-start;
+    padding: 8px; z-index: 10; flex-wrap: wrap; gap: 4px;
+  }
+  .ui-panel {
+    background: rgba(20,10,40,0.85); border: 2px solid #ff6b35;
+    border-radius: 10px; padding: 5px 10px; color: #fff; font-size: 13px;
+    pointer-events: all; display: flex; align-items: center; gap: 6px;
+  }
+  .ui-panel span { color: #ffd700; font-weight: bold; }
+  #energyBar { width: 80px; height: 12px; background: #333; border-radius: 6px; overflow: hidden; }
+  #energyFill { height: 100%; background: linear-gradient(90deg, #ff4444, #ffaa00, #44ff44); transition: width 0.3s; }
+  #mobileControls {
+    position: fixed; bottom: 10px; left: 0; width: 100%; display: none;
+    justify-content: space-between; align-items: flex-end; padding: 0 10px; z-index: 10; pointer-events: none;
+  }
+  .dpad { display: grid; grid-template-columns: repeat(3, 50px); grid-template-rows: repeat(3, 50px); gap: 3px; pointer-events: all; }
+  .dpad-btn {
+    background: rgba(255,107,53,0.7); border: 2px solid #ff6b35; border-radius: 10px;
+    color: #fff; font-size: 20px; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; touch-action: none; -webkit-tap-highlight-color: transparent;
+    transition: background 0.1s;
+  }
+  .dpad-btn:active { background: rgba(255,107,53,1); }
+  .dpad-empty { background: transparent; border: none; }
+  #mineBtn {
+    pointer-events: all; width: 70px; height: 70px;
+    background: rgba(255,50,50,0.8); border: 3px solid #ff2222; border-radius: 50%;
+    color: #fff; font-size: 28px; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; touch-action: none; -webkit-tap-highlight-color: transparent;
+  }
+  #actionBtns {
+    position: fixed; top: 60px; right: 8px; display: flex; flex-direction: column; gap: 6px; z-index: 10;
+  }
+  .action-btn {
+    width: 48px; height: 48px; background: rgba(20,10,40,0.85); border: 2px solid #ff6b35;
+    border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: border-color 0.2s;
+  }
+  .action-btn:hover { border-color: #ffd700; }
+  .action-btn img { width: 36px; height: 36px; object-fit: contain; }
+  /* Modal */
+  .modal {
+    display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.7); z-index: 100; align-items: center; justify-content: center;
+  }
+  .modal.open { display: flex; }
+  .modal-box {
+    background: #1a0a2e; border: 3px solid #ff6b35; border-radius: 16px;
+    padding: 16px; max-width: 95vw; max-height: 90vh; overflow-y: auto;
+    color: #fff; min-width: 300px;
+  }
+  .modal-box h2 { color: #ffd700; text-align: center; margin-bottom: 12px; font-size: 20px; }
+  .modal-close {
+    position: absolute; top: 8px; right: 12px; font-size: 24px;
+    cursor: pointer; color: #ff6b35; background: none; border: none; color: #ffd700;
+  }
+  .modal-box { position: relative; }
+  .item-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+  .item-card {
+    background: rgba(255,255,255,0.05); border: 2px solid #333; border-radius: 10px;
+    padding: 8px; text-align: center; cursor: pointer; transition: border-color 0.2s;
+  }
+  .item-card:hover { border-color: #ff6b35; }
+  .item-card img { width: 48px; height: 48px; object-fit: contain; }
+  .item-card .iname { font-size: 11px; color: #eee; margin: 4px 0 2px; }
+  .item-card .iprice { color: #ffd700; font-size: 12px; font-weight: bold; }
+  .item-card .icount { color: #aaa; font-size: 11px; }
+  .btn {
+    background: #ff6b35; color: #fff; border: none; border-radius: 8px;
+    padding: 6px 14px; cursor: pointer; font-family: inherit; font-size: 13px;
+    transition: background 0.2s;
+  }
+  .btn:hover { background: #e55a25; }
+  .btn-green { background: #33aa44; }
+  .btn-green:hover { background: #228833; }
+  .btn-blue { background: #3366dd; }
+  .btn-blue:hover { background: #224499; }
+  .owned-badge {
+    background: #33aa44; color: #fff; font-size: 10px; border-radius: 4px; padding: 1px 5px; margin-top: 3px; display: inline-block;
+  }
+  .toast {
+    position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%);
+    background: rgba(30,10,50,0.95); border: 2px solid #ffd700; color: #ffd700;
+    border-radius: 10px; padding: 8px 20px; font-size: 15px; z-index: 200;
+    animation: toastAnim 2s ease forwards; pointer-events: none;
+  }
+  @keyframes toastAnim { 0%{opacity:0;transform:translateX(-50%) translateY(10px)} 20%{opacity:1;transform:translateX(-50%) translateY(0)} 80%{opacity:1} 100%{opacity:0;transform:translateX(-50%) translateY(-10px)} }
+  .inv-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 6px; }
+  .rare-glow { animation: rareGlow 1.5s ease-in-out infinite alternate; }
+  @keyframes rareGlow { from{box-shadow:0 0 6px #ffd700} to{box-shadow:0 0 18px #ff6b35, 0 0 30px #ffd700} }
+</style>
+</head>
+<body>
+<canvas id="gameCanvas"></canvas>
+
+<!-- UI Top -->
+<div id="ui">
+  <div class="ui-panel">💰 <span id="uiMoney">0</span>
+  </div>
+  <div class="ui-panel">
+    ⚡ <div id="energyBar"><div id="energyFill" style="width:100%"></div></div>
+    <span id="uiEnergy">100</span>
+  </div>
+  <div class="ui-panel">📍 <span id="uiDepth">Superfície</span></div>
+  <div class="ui-panel">🎒 <span id="uiInv">0/10</span></div>
+</div>
+
+<!-- Action Buttons -->
+<div id="actionBtns">
+  <div class="action-btn" onclick="openInventory()" title="Inventário">
+    <img src="bot_inv.png" alt="Inv">
+  </div>
+  <div class="action-btn" onclick="openShop()" title="Loja">
+    <img src="bot_loj.png" alt="Loja">
+  </div>
+</div>
+
+<!-- Mobile Controls -->
+<div id="mobileControls">
+  <div class="dpad">
+    <div class="dpad-empty"></div>
+    <div class="dpad-btn" id="btnUp">▲</div>
+    <div class="dpad-empty"></div>
+    <div class="dpad-btn" id="btnLeft">◀</div>
+    <div class="dpad-empty"></div>
+    <div class="dpad-btn" id="btnRight">▶</div>
+    <div class="dpad-empty"></div>
+    <div class="dpad-btn" id="btnDown">▼</div>
+    <div class="dpad-empty"></div>
+  </div>
+  <div id="mineBtn">⛏️</div>
+</div>
+
+<!-- Inventory Modal -->
+<div class="modal" id="invModal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModal('invModal')">✕</button>
+    <h2>🎒 Inventário</h2>
+    <div class="inv-header">
+      <div>Espaço: <span id="invSpace" style="color:#ffd700"></span></div>
+      <div>Total: <span id="invTotal" style="color:#ffd700"></span></div>
+      <button class="btn btn-green" onclick="sellAll()">Vender Tudo</button>
+    </div>
+    <div class="item-grid" id="invGrid"></div>
+  </div>
+</div>
+
+<!-- Shop Modal -->
+<div class="modal" id="shopModal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModal('shopModal')">✕</button>
+    <h2>🏪 Loja</h2>
+    <h3 style="color:#ff6b35;margin:8px 0 6px">⛏️ Picaretas</h3>
+    <div class="item-grid" id="shopPickaxes"></div>
+    <h3 style="color:#ff6b35;margin:12px 0 6px">🎒 Mochilas</h3>
+    <div class="item-grid" id="shopBags"></div>
+  </div>
+</div>
+
+<script>
+// ===================== CONFIG =====================
+const BLOCK_SIZE = 40;
+const WORLD_WIDTH = 60;
+const WORLD_HEIGHT = 500;
+const SURFACE_Y = 8;
+
+// Block types [name, color, hp, depthStart]
+const BLOCK_TYPES = [
+  {id:'grama',     name:'Grama',           color:'#4a8f3f', hp:2,   depth:0,  img:'grama.png'},
+  {id:'terra',     name:'Terra',           color:'#8B5E3C', hp:4,   depth:1,  img:'terra.png'},
+  {id:'solo_fertil',name:'Solo Fértil',    color:'#7a5230', hp:6,   depth:3,  img:'solo_fertil.png'},
+  {id:'terra_compacta',name:'Terra Compacta',color:'#6b4423',hp:10, depth:8,  img:'terra_compacta.png'},
+  {id:'turfa',     name:'Turfa',           color:'#5c3820', hp:14,  depth:15, img:'turfa.png'},
+  {id:'argila',    name:'Argila',          color:'#c68642', hp:18,  depth:25, img:'argila.png'},
+  {id:'areia_compacta',name:'Areia Compacta',color:'#d4b483',hp:22,depth:40, img:'areia_compacta.png'},
+  {id:'pedra',     name:'Pedra',           color:'#888888', hp:30,  depth:60, img:'pedra.png'},
+  {id:'arenito',   name:'Arenito',         color:'#c8a26b', hp:38,  depth:80, img:'arenito.png'},
+  {id:'pedra_escura',name:'Pedra Escura',  color:'#444444', hp:50,  depth:100,img:'pedra_escura.png'},
+  {id:'calcario',  name:'Calcário',        color:'#ddd5c0', hp:62,  depth:130,img:'calcario.png'},
+  {id:'salgema',   name:'Salgema',         color:'#e8e0d0', hp:78,  depth:160,img:'salgema.png'},
+  {id:'marmore',   name:'Mármore',         color:'#f0ece4', hp:95,  depth:200,img:'marmore.png'},
+  {id:'gelo',      name:'Gelo',            color:'#b8e4f0', hp:110, depth:250,img:'gelo.png'},
+  {id:'rocha_vulcanica',name:'Rocha Vulcânica',color:'#3d1a0a',hp:135,depth:300,img:'rocha_vulcanica.png'},
+  {id:'cristal_de_pizza',name:'Cristal de Pizza',color:'#ff88cc',hp:165,depth:360,img:'cristal_de_pizza.png'},
+  {id:'obsidiana', name:'Obsidiana',       color:'#1a0a2e', hp:200, depth:420,img:'obsidiana.png'},
+  {id:'rocha_suprema',name:'Rocha Suprema',color:'#2a1a0e', hp:260, depth:480,img:'rocha_suprema.png'},
+];
+
+const PIZZAS = [
+  {id:'alho_e_oleo',     name:'Alho e Óleo',          img:'alho_e_oleo.png',      value:5,   energy:5,  rarity:0.35},
+  {id:'mucarela',        name:'Muçarela',              img:'mucarela.png',         value:8,   energy:7,  rarity:0.30},
+  {id:'calabresa',       name:'Calabresa',             img:'calabresa.png',        value:12,  energy:8,  rarity:0.25},
+  {id:'milho_bacon',     name:'Milho com Bacon',       img:'milho_bacon.png',      value:16,  energy:9,  rarity:0.20},
+  {id:'marguerita',      name:'Marguerita',            img:'marguerita.png',       value:20,  energy:10, rarity:0.17},
+  {id:'frango_requeijao',name:'Frango c/ Requeijão',   img:'frango_requeijao.png', value:26,  energy:11, rarity:0.14},
+  {id:'portuguesa',      name:'Portuguesa',            img:'portuguesa.png',       value:32,  energy:12, rarity:0.11},
+  {id:'napolitana',      name:'Napolitana',            img:'napolitana.png',       value:40,  energy:13, rarity:0.09},
+  {id:'quatro_queijos',  name:'Quatro Queijos',        img:'quatro_queijos.png',   value:50,  energy:14, rarity:0.075},
+  {id:'doritos',         name:'Doritos',               img:'doritos.png',          value:62,  energy:15, rarity:0.062},
+  {id:'lombo_canadense', name:'Lombo Canadense',       img:'lombo_canadense.png',  value:78,  energy:16, rarity:0.050},
+  {id:'palmito_catupiry',name:'Palmito c/ Catupiry',   img:'palmito_catupiry.png', value:95,  energy:18, rarity:0.040},
+  {id:'carne_seca',      name:'Carne Seca c/ Catupiry',img:'carne_seca.png',       value:115, energy:20, rarity:0.033},
+  {id:'pepperoni',       name:'Pepperoni',             img:'pepperoni.png',        value:140, energy:22, rarity:0.026},
+  {id:'atum_cebola',     name:'Atum c/ Cebola Roxa',  img:'atum_cebola.png',      value:170, energy:24, rarity:0.021},
+  {id:'shitakerita',     name:'Shitakerita',           img:'shitakerita.png',      value:210, energy:27, rarity:0.016},
+  {id:'file_gorgonzola', name:'Filé c/ Gorgonzola',   img:'file_gorgonzola.png',  value:260, energy:30, rarity:0.013},
+  {id:'picanha_acebolada',name:'Picanha Acebolada',    img:'picanha_acebolada.png',value:320, energy:34, rarity:0.010},
+  {id:'strogonoff_frango',name:'Strogonoff de Frango', img:'strogonoff_frango.png',value:400, energy:38, rarity:0.008},
+  {id:'strogonoff_carne',name:'Strogonoff de Carne',  img:'strogonoff_carne.png', value:490, energy:42, rarity:0.006},
+  {id:'queijo_damasco',  name:'Queijo Brie c/ Damasco',img:'queijo_damasco.png',  value:600, energy:47, rarity:0.005},
+  {id:'carpaccio_carne', name:'Carpaccio de Carne',   img:'carpaccio_carne.png',  value:740, energy:52, rarity:0.004},
+  {id:'presunto_figos',  name:'Presunto de Parma c/ Figos',img:'presunto_figos.png',value:900,energy:58,rarity:0.003},
+  {id:'camarao_aspargos',name:'Camarão c/ Aspargos',  img:'camarao_aspargos.png', value:1100,energy:65, rarity:0.0024},
+  {id:'alho_negro',      name:'Alho Negro c/ Queijo de Cabra',img:'alho_negro.png',value:1350,energy:73,rarity:0.0018},
+  {id:'trufa_negra',     name:'Trufa Negra c/ Queijo Brie',img:'trufa_negra.png', value:1650,energy:82, rarity:0.0013},
+  {id:'lagosta_poro',    name:'Lagosta c/ Alho-Poró', img:'lagosta_poro.png',     value:2000,energy:92, rarity:0.0009},
+  {id:'lindt',           name:'Pizza da Lindt',        img:'lindt.png',            value:2500,energy:100,rarity:0.0006},
+  {id:'matteo',          name:'Pizza Sabor Matteo',    img:'matteo.png',           value:3200,energy:100,rarity:0.0003},
+];
+
+const PICKAXES = [
+  {id:'madeira',  name:'Madeira',       img:'pic_madeira.png',      price:0,    power:1, energyCost:5,  speed:800},
+  {id:'pedra',    name:'Pedra',         img:'pic_pedra.png',        price:150,  power:2, energyCost:4,  speed:700},
+  {id:'ferro',    name:'Ferro',         img:'pic_ferro.png',        price:600,  power:4, energyCost:3,  speed:600},
+  {id:'ouro',     name:'Ouro',          img:'pic_ouro.png',         price:2000, power:7, energyCost:2,  speed:500},
+  {id:'diamante', name:'Diamante',      img:'pic_diamante.png',     price:8000, power:14,energyCost:1,  speed:380},
+  {id:'pizza_suprema',name:'Pizza Suprema',img:'pic_pizza_suprema.png',price:30000,power:30,energyCost:0.5,speed:250},
+];
+
+const BAGS = [
+  {id:'pequena', name:'Pequena',  img:'moc_peq.png',  price:0,    capacity:10},
+  {id:'media',   name:'Média',    img:'moc_med.png',  price:200,  capacity:25},
+  {id:'grande',  name:'Grande',   img:'moc_gra.png',  price:800,  capacity:50},
+  {id:'gigante', name:'Gigante',  img:'moc_gig.png',  price:3000, capacity:120},
+  {id:'armazem', name:'Armazém',  img:'mochilas.png', price:15000,capacity:400},
+];
+
+// ===================== GAME STATE =====================
+let state = {
+  money: 0,
+  energy: 100,
+  maxEnergy: 100,
+  pickaxe: 'madeira',
+  bag: 'pequena',
+  inventory: {},
+  playerX: Math.floor(WORLD_WIDTH/2),
+  playerY: SURFACE_Y - 1,
+  maxDepth: 0,
+};
+
+// World chunk storage
+const worldChunks = {};
+const particles = [];
+let miningTarget = null;
+let miningProgress = 0;
+let lastMineTime = 0;
+let isMining = false;
+let playerFacing = 1;
+let mouseX = 0, mouseY = 0;
+
+// Images cache
+const imgCache = {};
+function loadImg(src) {
+  if (!imgCache[src]) {
+    const img = new Image();
+    img.src = src;
+    imgCache[src] = img;
+  }
+  return imgCache[src];
+}
+
+// Preload all images
+[...BLOCK_TYPES.map(b=>b.img), ...PIZZAS.map(p=>p.img),
+ ...PICKAXES.map(p=>p.img), ...BAGS.map(b=>b.img),
+ 'jogador_p.png','jogador_m.png','bot_inv.png','bot_loj.png',
+ 'moc_arm.png'
+].forEach(loadImg);
+
+// ===================== WORLD GEN =====================
+function chunkKey(cx, cy) { return `${cx},${cy}`; }
+const CHUNK_SIZE = 16;
+
+function getBlock(wx, wy) {
+  const cx = Math.floor(wx/CHUNK_SIZE), cy = Math.floor(wy/CHUNK_SIZE);
+  const key = chunkKey(cx,cy);
+  if (!worldChunks[key]) generateChunk(cx, cy);
+  const lx = ((wx % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
+  const ly = ((wy % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
+  return worldChunks[key][lx][ly];
+}
+
+function setBlock(wx, wy, val) {
+  const cx = Math.floor(wx/CHUNK_SIZE), cy = Math.floor(wy/CHUNK_SIZE);
+  const key = chunkKey(cx,cy);
+  if (!worldChunks[key]) generateChunk(cx, cy);
+  const lx = ((wx % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
+  const ly = ((wy % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
+  worldChunks[key][lx][ly] = val;
+}
+
+function getBlockTypeForDepth(depth) {
+  let best = BLOCK_TYPES[0];
+  for (const bt of BLOCK_TYPES) {
+    if (depth >= bt.depth) best = bt;
+    else break;
+  }
+  return best;
+}
+
+// seeded random per position
+function seededRand(x, y) {
+  let h = (x * 374761393 + y * 668265263) | 0;
+  h = (h ^ (h >> 13)) | 0;
+  h = (Math.imul(h, 1540483477)) | 0;
+  h = (h ^ (h >> 15)) | 0;
+  return (h >>> 0) / 4294967296;
+}
+
+function generateChunk(cx, cy) {
+  const chunk = [];
+  for (let lx = 0; lx < CHUNK_SIZE; lx++) {
+    chunk.push([]);
+    for (let ly = 0; ly < CHUNK_SIZE; ly++) {
+      const wx = cx*CHUNK_SIZE + lx;
+      const wy = cy*CHUNK_SIZE + ly;
+      chunk[lx].push(generateBlock(wx, wy));
+    }
+  }
+  worldChunks[chunkKey(cx,cy)] = chunk;
+}
+
+function generateBlock(wx, wy) {
+  // Sky
+  if (wy < SURFACE_Y - 1) return null;
+  // Surface top row (grass)
+  if (wy === SURFACE_Y - 1) return {type:'grama', hp: BLOCK_TYPES[0].hp, maxHp: BLOCK_TYPES[0].hp, pizza: null};
+  const depth = wy - SURFACE_Y;
+  const bt = getBlockTypeForDepth(depth);
+  // Pizza chance scales with depth
+  const r = seededRand(wx, wy);
+  const baseChance = Math.min(0.08, 0.01 + depth * 0.0003);
+  let pizza = null;
+  if (r < baseChance) {
+    // Pick pizza based on depth
+    const eligible = PIZZAS.filter((p,i) => i/PIZZAS.length <= (depth/480 + 0.15));
+    if (eligible.length) {
+      // weighted by rarity
+      let totalWeight = eligible.reduce((s,p)=>s+p.rarity,0);
+      let pick = seededRand(wx*7+1, wy*13+2) * totalWeight;
+      for (const p of eligible) { pick -= p.rarity; if (pick <= 0) { pizza = p.id; break; } }
+      if (!pizza) pizza = eligible[eligible.length-1].id;
+    }
+  }
+  return {type: bt.id, hp: bt.hp, maxHp: bt.hp, pizza};
+}
+
+// ===================== CANVAS SETUP =====================
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+let CAM_COLS, CAM_ROWS, camX = 0, camY = 0;
+
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  CAM_COLS = Math.ceil(canvas.width / BLOCK_SIZE) + 2;
+  CAM_ROWS = Math.ceil(canvas.height / BLOCK_SIZE) + 2;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// Camera follows player
+function updateCamera() {
+  camX = state.playerX - Math.floor(CAM_COLS/2);
+  camY = state.playerY - Math.floor(CAM_ROWS/2);
+}
+
+// ===================== INPUT =====================
+const keys = {};
+window.addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','KeyW','KeyA','KeyS','KeyD'].includes(e.code)) e.preventDefault();
+});
+window.addEventListener('keyup', e => { keys[e.code] = false; });
+
+// Mouse for mining target
+canvas.addEventListener('mousemove', e => {
+  const rect = canvas.getBoundingClientRect();
+  mouseX = e.clientX - rect.left;
+  mouseY = e.clientY - rect.top;
+});
+canvas.addEventListener('click', e => {
+  if (document.querySelector('.modal.open')) return;
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  tryMineAt(mx, my);
+});
+
+// Touch mining
+canvas.addEventListener('touchstart', e => {
+  if (document.querySelector('.modal.open')) return;
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const t = e.touches[0];
+  mouseX = t.clientX - rect.left;
+  mouseY = t.clientY - rect.top;
+  tryMineAt(mouseX, mouseY);
+}, {passive: false});
+canvas.addEventListener('touchmove', e => {
+  const rect = canvas.getBoundingClientRect();
+  const t = e.touches[0];
+  mouseX = t.clientX - rect.left;
+  mouseY = t.clientY - rect.top;
+}, {passive: true});
+
+function screenToWorld(sx, sy) {
+  return {
+    wx: Math.floor(camX + sx / BLOCK_SIZE),
+    wy: Math.floor(camY + sy / BLOCK_SIZE),
+  };
+}
+
+function tryMineAt(sx, sy) {
+  const {wx, wy} = screenToWorld(sx, sy);
+  // Must be adjacent to player (1-2 blocks range)
+  const dx = Math.abs(wx - state.playerX);
+  const dy = Math.abs(wy - state.playerY);
+  if (dx <= 2 && dy <= 2) {
+    miningTarget = {wx, wy};
+  }
+}
+
+// Mobile controls
+let mobileKeys = {};
+function addDpadBtn(id, key) {
+  const btn = document.getElementById(id);
+  if (!btn) return;
+  btn.addEventListener('touchstart', e => { e.preventDefault(); mobileKeys[key] = true; }, {passive:false});
+  btn.addEventListener('touchend', e => { e.preventDefault(); mobileKeys[key] = false; }, {passive:false});
+  btn.addEventListener('mousedown', () => mobileKeys[key] = true);
+  btn.addEventListener('mouseup', () => mobileKeys[key] = false);
+}
+addDpadBtn('btnUp','up'); addDpadBtn('btnDown','down');
+addDpadBtn('btnLeft','left'); addDpadBtn('btnRight','right');
+
+const mineBtn = document.getElementById('mineBtn');
+mineBtn.addEventListener('touchstart', e => { e.preventDefault(); isMining = true; }, {passive:false});
+mineBtn.addEventListener('touchend', e => { e.preventDefault(); isMining = false; }, {passive:false});
+
+// Auto-detect mobile
+function isMobileDevice() { return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth < 600; }
+if (isMobileDevice()) {
+  document.getElementById('mobileControls').style.display = 'flex';
+}
+window.addEventListener('resize', () => {
+  if (isMobileDevice()) document.getElementById('mobileControls').style.display = 'flex';
+  else document.getElementById('mobileControls').style.display = 'none';
+});
+
+// ===================== MOVEMENT =====================
+let moveTimer = 0;
+const MOVE_DELAY = 120; // ms per step
+
+function tryMove(dx, dy) {
+  const nx = state.playerX + dx;
+  const ny = state.playerY + dy;
+  if (nx < 0 || nx >= WORLD_WIDTH) return;
+  const block = getBlock(nx, ny);
+  if (!block) { // empty/sky
+    state.playerX = nx; state.playerY = ny;
+    return;
+  }
+  // If block exists can't move, try mine it instead
+  miningTarget = {wx: nx, wy: ny};
+}
+
+// ===================== MINING =====================
+function getCurrentPickaxe() { return PICKAXES.find(p=>p.id===state.pickaxe) || PICKAXES[0]; }
+function getCurrentBag() { return BAGS.find(b=>b.id===state.bag) || BAGS[0]; }
+
+function inventoryCount() { return Object.values(state.inventory).reduce((s,v)=>s+v,0); }
+
+function doMine(wx, wy) {
+  const pick = getCurrentPickaxe();
+  const now = Date.now();
+  if (now - lastMineTime < pick.speed) return;
+  lastMineTime = now;
+  if (state.energy <= 0) { showToast('⚡ Sem energia! Coma uma pizza.'); return; }
+  const block = getBlock(wx, wy);
+  if (!block) return;
+  block.hp -= pick.power;
+  state.energy = Math.max(0, state.energy - pick.energyCost);
+  // Particles
+  spawnParticles(wx, wy, BLOCK_TYPES.find(b=>b.id===block.type)?.color || '#888');
+  if (block.hp <= 0) {
+    // Collect pizza if present
+    if (block.pizza) {
+      const cap = getCurrentBag().capacity;
+      if (inventoryCount() >= cap) { showToast('🎒 Mochila cheia!'); }
+      else {
+        state.inventory[block.pizza] = (state.inventory[block.pizza] || 0) + 1;
+        const pz = PIZZAS.find(p=>p.id===block.pizza);
+        showToast(`🍕 ${pz.name} encontrada!`);
+      }
+    }
+    setBlock(wx, wy, null);
+    miningTarget = null;
+    // Update max depth
+    const d = wy - SURFACE_Y;
+    if (d > state.maxDepth) state.maxDepth = d;
+  }
+}
+
+// ===================== PARTICLES =====================
+function spawnParticles(wx, wy, color) {
+  const sx = (wx - camX) * BLOCK_SIZE + BLOCK_SIZE/2;
+  const sy = (wy - camY) * BLOCK_SIZE + BLOCK_SIZE/2;
+  for (let i = 0; i < 6; i++) {
+    particles.push({
+      x: sx, y: sy,
+      vx: (Math.random()-0.5)*4, vy: (Math.random()-0.5)*4,
+      life: 1, color, size: 4+Math.random()*4
+    });
+  }
+}
+
+function updateParticles() {
+  for (let i = particles.length-1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx; p.y += p.vy;
+    p.vy += 0.15;
+    p.life -= 0.04;
+    if (p.life <= 0) particles.splice(i,1);
+  }
+}
+
+// ===================== DRAW =====================
+function drawSky() {
+  const skyTop = (0 - camY) * BLOCK_SIZE;
+  const skyBot = (SURFACE_Y - camY) * BLOCK_SIZE;
+  const grad = ctx.createLinearGradient(0, skyTop, 0, skyBot);
+  grad.addColorStop(0, '#1a6fa8');
+  grad.addColorStop(1, '#87ceeb');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, Math.min(skyTop, 0), canvas.width, Math.max(skyBot - skyTop, canvas.height/2));
+}
+
+function drawUnderground() {
+  // Dark gradient for underground
+  const topY = Math.max(0, (SURFACE_Y - camY) * BLOCK_SIZE);
+  if (topY < canvas.height) {
+    const grad = ctx.createLinearGradient(0, topY, 0, canvas.height);
+    grad.addColorStop(0, '#1a120a');
+    grad.addColorStop(1, '#050208');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, topY, canvas.width, canvas.height - topY);
+  }
+}
+
+function drawBlocks() {
+  for (let row = 0; row < CAM_ROWS; row++) {
+    for (let col = 0; col < CAM_COLS; col++) {
+      const wx = Math.floor(camX) + col;
+      const wy = Math.floor(camY) + row;
+      if (wx < 0 || wx >= WORLD_WIDTH) continue;
+      const sx = col * BLOCK_SIZE - (camX - Math.floor(camX))*BLOCK_SIZE;
+      const sy = row * BLOCK_SIZE - (camY - Math.floor(camY))*BLOCK_SIZE;
+      const block = getBlock(wx, wy);
+      if (!block) continue;
+      const bt = BLOCK_TYPES.find(b=>b.id===block.type);
+      if (!bt) continue;
+      // Draw block color
+      const hpRatio = block.hp / block.maxHp;
+      ctx.fillStyle = bt.color;
+      ctx.fillRect(sx, sy, BLOCK_SIZE, BLOCK_SIZE);
+      // Try image
+      const img = loadImg(bt.img);
+      if (img.complete && img.naturalWidth > 0) {
+        ctx.drawImage(img, sx, sy, BLOCK_SIZE, BLOCK_SIZE);
+      }
+      // Crack overlay
+      if (hpRatio < 1) {
+        ctx.fillStyle = `rgba(0,0,0,${0.5*(1-hpRatio)})`;
+        ctx.fillRect(sx, sy, BLOCK_SIZE, BLOCK_SIZE);
+        // draw cracks
+        ctx.strokeStyle = `rgba(0,0,0,${0.7*(1-hpRatio)})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(sx+BLOCK_SIZE*0.3, sy+BLOCK_SIZE*0.2);
+        ctx.lineTo(sx+BLOCK_SIZE*0.5, sy+BLOCK_SIZE*0.6);
+        ctx.lineTo(sx+BLOCK_SIZE*0.7, sy+BLOCK_SIZE*0.4);
+        ctx.stroke();
+      }
+      // Pizza glow
+      if (block.pizza) {
+        const pz = PIZZAS.find(p=>p.id===block.pizza);
+        const glowStrength = 0.3 + 0.2*Math.sin(Date.now()/300);
+        ctx.fillStyle = `rgba(255,200,50,${glowStrength})`;
+        ctx.fillRect(sx, sy, BLOCK_SIZE, BLOCK_SIZE);
+        const pimg = loadImg(pz.img);
+        if (pimg.complete && pimg.naturalWidth > 0) {
+          ctx.drawImage(pimg, sx+4, sy+4, BLOCK_SIZE-8, BLOCK_SIZE-8);
+        } else {
+          ctx.fillStyle = '#ffd700';
+          ctx.font = `${BLOCK_SIZE*0.6}px serif`;
+          ctx.textAlign = 'center';
+          ctx.fillText('🍕', sx+BLOCK_SIZE/2, sy+BLOCK_SIZE*0.7);
+        }
+      }
+      // Border
+      ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+      ctx.lineWidth = 0.5;
+      ctx.strokeRect(sx, sy, BLOCK_SIZE, BLOCK_SIZE);
+    }
+  }
+}
+
+function drawMiningHighlight() {
+  if (!miningTarget) return;
+  const sx = (miningTarget.wx - camX) * BLOCK_SIZE;
+  const sy = (miningTarget.wy - camY) * BLOCK_SIZE;
+  const pulse = 0.6 + 0.4*Math.sin(Date.now()/150);
+  ctx.strokeStyle = `rgba(255,220,0,${pulse})`;
+  ctx.lineWidth = 3;
+  ctx.strokeRect(sx+1, sy+1, BLOCK_SIZE-2, BLOCK_SIZE-2);
+}
+
+function drawHoverHighlight() {
+  const {wx, wy} = screenToWorld(mouseX, mouseY);
+  const block = getBlock(wx, wy);
+  if (!block) return;
+  const sx = (wx - camX) * BLOCK_SIZE;
+  const sy = (wy - camY) * BLOCK_SIZE;
+  ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(sx, sy, BLOCK_SIZE, BLOCK_SIZE);
+}
+
+function drawPlayer() {
+  const sx = (state.playerX - camX) * BLOCK_SIZE;
+  const sy = (state.playerY - camY) * BLOCK_SIZE;
+  const imgName = isMining ? 'jogador_m.png' : 'jogador_p.png';
+  const img = loadImg(imgName);
+  ctx.save();
+  if (playerFacing < 0) {
+    ctx.translate(sx + BLOCK_SIZE, sy);
+    ctx.scale(-1, 1);
+    if (img.complete && img.naturalWidth > 0) ctx.drawImage(img, 0, 0, BLOCK_SIZE, BLOCK_SIZE);
+    else { ctx.fillStyle='#ff6b35'; ctx.fillRect(0,0,BLOCK_SIZE,BLOCK_SIZE); ctx.fillStyle='#fff'; ctx.font='24px serif'; ctx.fillText('👷',4,28); }
+  } else {
+    if (img.complete && img.naturalWidth > 0) ctx.drawImage(img, sx, sy, BLOCK_SIZE, BLOCK_SIZE);
+    else { ctx.fillStyle='#ff6b35'; ctx.fillRect(sx,sy,BLOCK_SIZE,BLOCK_SIZE); ctx.fillStyle='#fff'; ctx.font='24px serif'; ctx.fillText('👷',sx+4,sy+28); }
+  }
+  ctx.restore();
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    ctx.save();
+    ctx.globalAlpha = p.life;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+function drawUI_canvas() {
+  // Pickaxe & bag mini display (bottom-left)
+  const pick = getCurrentPickaxe();
+  const bag = getCurrentBag();
+  const pimg = loadImg(pick.img);
+  const bimg = loadImg(bag.img);
+  ctx.save();
+  ctx.fillStyle = 'rgba(20,10,40,0.7)';
+  ctx.roundRect(8, canvas.height-60, 120, 52, 8);
+  ctx.fill();
+  if (pimg.complete && pimg.naturalWidth > 0) ctx.drawImage(pimg, 12, canvas.height-56, 40, 40);
+  if (bimg.complete && bimg.naturalWidth > 0) ctx.drawImage(bimg, 60, canvas.height-56, 40, 40);
+  ctx.fillStyle = '#aaa'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText(pick.name, 32, canvas.height-10);
+  ctx.fillText(bag.name, 80, canvas.height-10);
+  ctx.restore();
+}
+
+// ===================== UPDATE UI =====================
+function updateUI() {
+  document.getElementById('uiMoney').textContent = '🪙' + state.money.toLocaleString('pt-BR');
+  document.getElementById('uiEnergy').textContent = Math.ceil(state.energy);
+  document.getElementById('energyFill').style.width = (state.energy/state.maxEnergy*100) + '%';
+  const depth = state.playerY - SURFACE_Y;
+  if (depth <= 0) {
+    document.getElementById('uiDepth').textContent = depth === 0 ? 'Superfície' : `Altitude ${-depth}m`;
+  } else {
+    document.getElementById('uiDepth').textContent = `Profundidade ${depth}m`;
+  }
+  const cap = getCurrentBag().capacity;
+  document.getElementById('uiInv').textContent = `${inventoryCount()}/${cap}`;
+}
+
+// ===================== GAME LOOP =====================
+let lastTime = 0;
+let moveAccum = 0;
+
+function gameLoop(ts) {
+  const dt = ts - lastTime; lastTime = ts;
+  moveAccum += dt;
+
+  // Movement
+  if (moveAccum >= MOVE_DELAY) {
+    moveAccum = 0;
+    let dx=0, dy=0;
+    if (keys['KeyW']||keys['ArrowUp']||mobileKeys['up']) dy=-1;
+    else if (keys['KeyS']||keys['ArrowDown']||mobileKeys['down']) dy=1;
+    if (keys['KeyA']||keys['ArrowLeft']||mobileKeys['left']) { dx=-1; playerFacing=-1; }
+    else if (keys['KeyD']||keys['ArrowRight']||mobileKeys['right']) { dx=1; playerFacing=1; }
+    if (dx||dy) tryMove(dx,dy);
+  }
+
+  // Auto-mine target
+  if (miningTarget) {
+    const block = getBlock(miningTarget.wx, miningTarget.wy);
+    if (!block) { miningTarget = null; }
+    else {
+      const dx = Math.abs(miningTarget.wx - state.playerX);
+      const dy = Math.abs(miningTarget.wy - state.playerY);
+      if (dx <= 2 && dy <= 2) {
+        doMine(miningTarget.wx, miningTarget.wy);
+        isMining = true;
+      } else { isMining = false; }
+    }
+  } else { isMining = false; }
+
+  // Energy regen (very slow)
+  if (state.energy < state.maxEnergy && !isMining) {
+    state.energy = Math.min(state.maxEnergy, state.energy + 0.01);
+  }
+
+  updateCamera();
+  updateParticles();
+
+  // Draw
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  drawSky();
+  drawUnderground();
+  drawBlocks();
+  drawMiningHighlight();
+  drawHoverHighlight();
+  drawPlayer();
+  drawParticles();
+  drawUI_canvas();
+  updateUI();
+
+  requestAnimationFrame(gameLoop);
+}
+
+// ===================== INVENTORY =====================
+function openInventory() {
+  const grid = document.getElementById('invGrid');
+  grid.innerHTML = '';
+  let total = 0;
+  for (const [id, qty] of Object.entries(state.inventory)) {
+    if (!qty) continue;
+    const pz = PIZZAS.find(p=>p.id===id);
+    if (!pz) continue;
+    total += pz.value * qty;
+    const card = document.createElement('div');
+    card.className = 'item-card';
+    const rareIdx = PIZZAS.indexOf(pz);
+    if (rareIdx >= 15) card.classList.add('rare-glow');
+    card.innerHTML = `
+      <img src="${pz.img}" alt="${pz.name}" onerror="this.style.fontSize='28px';this.alt='🍕'">
+      <div class="iname">${pz.name}</div>
+      <div class="iprice">🪙${pz.value} each</div>
+      <div class="icount">Qtd: ${qty} | ⚡${pz.energy}</div>
+      <div style="display:flex;gap:4px;justify-content:center;margin-top:6px">
+        <button class="btn btn-green" onclick="eatPizza('${id}')">Comer</button>
+        <button class="btn" onclick="sellPizza('${id}',1)">Vender</button>
+      </div>`;
+    grid.appendChild(card);
+  }
+  if (!Object.keys(state.inventory).length) {
+    grid.innerHTML = '<div style="color:#aaa;text-align:center;padding:20px">Inventário vazio! Vá minerar! 🍕</div>';
+  }
+  const cap = getCurrentBag().capacity;
+  document.getElementById('invSpace').textContent = `${inventoryCount()}/${cap}`;
+  document.getElementById('invTotal').textContent = `🪙${total.toLocaleString('pt-BR')}`;
+  document.getElementById('invModal').classList.add('open');
+}
+
+function eatPizza(id) {
+  if (!state.inventory[id]) return;
+  const pz = PIZZAS.find(p=>p.id===id);
+  if (!pz) return;
+  state.energy = Math.min(state.maxEnergy, state.energy + pz.energy);
+  state.inventory[id]--;
+  if (!state.inventory[id]) delete state.inventory[id];
+  showToast(`😋 Comeu ${pz.name}! +${pz.energy}⚡`);
+  openInventory();
+}
+
+function sellPizza(id, qty) {
+  if (!state.inventory[id]) return;
+  const pz = PIZZAS.find(p=>p.id===id);
+  const sold = Math.min(qty, state.inventory[id]);
+  state.money += pz.value * sold;
+  state.inventory[id] -= sold;
+  if (!state.inventory[id]) delete state.inventory[id];
+  showToast(`💰 Vendeu por 🪙${(pz.value*sold).toLocaleString('pt-BR')}!`);
+  openInventory();
+}
+
+function sellAll() {
+  let total = 0;
+  for (const [id, qty] of Object.entries(state.inventory)) {
+    const pz = PIZZAS.find(p=>p.id===id);
+    if (pz && qty) { total += pz.value * qty; }
+  }
+  state.money += total;
+  state.inventory = {};
+  showToast(`💰 Vendeu tudo por 🪙${total.toLocaleString('pt-BR')}!`);
+  openInventory();
+}
+
+// ===================== SHOP =====================
+function openShop() {
+  // Pickaxes
+  const pg = document.getElementById('shopPickaxes');
+  pg.innerHTML = '';
+  for (const pick of PICKAXES) {
+    const owned = state.pickaxe === pick.id || PICKAXES.indexOf(pick) < PICKAXES.findIndex(p=>p.id===state.pickaxe);
+    const card = document.createElement('div');
+    card.className = 'item-card';
+    card.innerHTML = `
+      <img src="${pick.img}" alt="${pick.name}">
+      <div class="iname">${pick.name}</div>
+      <div class="iprice">🪙${pick.price.toLocaleString('pt-BR')}</div>
+      <div class="icount">Poder: ${pick.power} | ⚡-${pick.energyCost}</div>
+      ${owned && state.pickaxe===pick.id ? '<div class="owned-badge">✓ Em uso</div>' : ''}
+      ${!owned ? `<button class="btn btn-blue" onclick="buyPickaxe('${pick.id}')">Comprar</button>` : (state.pickaxe!==pick.id ? '<div class="owned-badge">✓ Possuído</div>' : '')}
+    `;
+    pg.appendChild(card);
+  }
+  // Bags
+  const bg = document.getElementById('shopBags');
+  bg.innerHTML = '';
+  for (const bag of BAGS) {
+    const ownedIdx = BAGS.findIndex(b=>b.id===state.bag);
+    const thisIdx = BAGS.indexOf(bag);
+    const owned = thisIdx <= ownedIdx;
+    const card = document.createElement('div');
+    card.className = 'item-card';
+    card.innerHTML = `
+      <img src="${bag.img}" alt="${bag.name}">
+      <div class="iname">${bag.name}</div>
+      <div class="iprice">🪙${bag.price.toLocaleString('pt-BR')}</div>
+      <div class="icount">Cap: ${bag.capacity} pizzas</div>
+      ${owned && state.bag===bag.id ? '<div class="owned-badge">✓ Em uso</div>' : ''}
+      ${!owned ? `<button class="btn btn-blue" onclick="buyBag('${bag.id}')">Comprar</button>` : (state.bag!==bag.id ? '<div class="owned-badge">✓ Possuído</div>' : '')}
+    `;
+    bg.appendChild(card);
+  }
+  document.getElementById('shopModal').classList.add('open');
+}
+
+function buyPickaxe(id) {
+  const pick = PICKAXES.find(p=>p.id===id);
+  if (!pick || state.money < pick.price) { showToast('💸 Dinheiro insuficiente!'); return; }
+  state.money -= pick.price;
+  state.pickaxe = id;
+  showToast(`⛏️ Comprou Picareta de ${pick.name}!`);
+  openShop();
+}
+
+function buyBag(id) {
+  const bag = BAGS.find(b=>b.id===id);
+  if (!bag || state.money < bag.price) { showToast('💸 Dinheiro insuficiente!'); return; }
+  state.money -= bag.price;
+  state.bag = id;
+  showToast(`🎒 Comprou Mochila ${bag.name}!`);
+  openShop();
+}
+
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+  saveGame();
+}
+
+// ===================== TOAST =====================
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast'; t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2100);
+}
+
+// ===================== SAVE/LOAD =====================
+function saveGame() {
+  try {
+    const data = {
+      money: state.money, energy: state.energy,
+      pickaxe: state.pickaxe, bag: state.bag,
+      inventory: state.inventory,
+      playerX: state.playerX, playerY: state.playerY,
+      maxDepth: state.maxDepth,
+    };
+    localStorage.setItem('minerador_pizza_save', JSON.stringify(data));
+  } catch(e) {}
+}
+
+function loadGame() {
+  try {
+    const raw = localStorage.getItem('minerador_pizza_save');
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    Object.assign(state, data);
+  } catch(e) {}
+}
+
+// Auto-save every 15s
+setInterval(saveGame, 15000);
+
+// ===================== START =====================
+loadGame();
+requestAnimationFrame(ts => { lastTime = ts; gameLoop(ts); });
+</script>
+</body>
+</html>
